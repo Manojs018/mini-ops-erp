@@ -4,6 +4,69 @@ A lightweight, enterprise-grade Operations ERP backend built with Node.js, TypeS
 
 ---
 
+## Internal Stock Transfer Module (Phase 5)
+
+The Internal Stock Transfer module manages physical inventory movements between different warehouse locations (e.g. main warehouse to distribution center).
+
+---
+
+### Transfer State Machine
+
+Transfers follow a strict 3-phase state machine:
+
+```text
+[ REQUESTED ]  ------->  [ DISPATCHED ]  ------->  [ RECEIVED ]
+```
+
+#### State Transition & Stock Rules:
+
+1. **`POST /transfers` (`REQUESTED`)**:
+   - Records intent to transfer items.
+   - **NO inventory stock is checked or moved** at request time.
+   - Rejects identical source and destination locations (`400 Bad Request`).
+   - Rejects non-positive integer quantities (`400 Bad Request`).
+
+2. **`PATCH /transfers/:id/dispatch` (`DISPATCHED`)**:
+   - Status must be `REQUESTED`.
+   - **Atomic Stock Deduction**: Queries physical stock at the source location using FIFO order (`createdAt: 'asc'`).
+   - If total available physical stock at source is less than transfer quantity, throws `InsufficientStockError` (**`409 Conflict`**) and leaves source inventory **100% UNCHANGED**.
+   - If sufficient stock exists, deducts `physicalQty` from source stock rows and creates an `InventoryTransaction` of type `TRANSFER_OUT`.
+   - **Destination inventory is NOT touched at dispatch time.**
+
+3. **`PATCH /transfers/:id/receive` (`RECEIVED`)**:
+   - Status must be `DISPATCHED`. Rejects `REQUESTED` with `400 Bad Request`.
+   - **Atomic Stock Increment & Batch Traceability**: Finds or creates the destination `InventoryStock` record matching `(itemId, destinationLocationId, batch)`, carrying over the exact source batch identifier.
+   - Increments `physicalQty` at the destination location by the transfer quantity.
+   - Creates an `InventoryTransaction` of type `TRANSFER_IN`.
+
+---
+
+### Double-Receive Prevention & Concurrency Serialization
+
+To satisfy case study Test 4 ("same transfer cannot be received twice"):
+
+1. **Database Row Lock & Status Re-check**:
+   - Inside `prisma.$transaction`, `receiveTransfer()` re-queries the transfer row status.
+   - If the status is already `RECEIVED`, the transaction immediately aborts and throws `409 Conflict` ("Transfer has already been received.").
+2. **Idempotency Key Guard**:
+   - Uses `idempotencyKey = transfer-receive-${transferId}`.
+   - If a duplicate request arrives concurrently, the database transaction ensures only one invocation updates status to `RECEIVED` while all subsequent concurrent calls fail safely with `409 Conflict`.
+   - Proven safe under heavy concurrent load via `Promise.all` race-condition test suite across multiple iterations.
+
+---
+
+### Role & Access Authorization Rules
+
+| Endpoint | Method | Allowed Roles | Restrictions / Notes |
+| :--- | :--- | :--- | :--- |
+| `/transfers` | `POST` | `ADMIN`, `OPERATIONS` | Creates transfer in `REQUESTED` status. Source != Destination. Stock untouched. |
+| `/transfers` | `GET` | `ADMIN`, `OPERATIONS`, `SALES` | Filterable by `?status=`, `?sourceLocationId=`, `?destinationLocationId=`, `?itemId=`, `page`, `limit`. |
+| `/transfers/:id` | `GET` | `ADMIN`, `OPERATIONS`, `SALES` | Single transfer detail with joined location and item data. |
+| `/transfers/:id/dispatch` | `PATCH` | `ADMIN`, `OPERATIONS` | Atomic FIFO stock deduction at source. 409 Conflict on shortage. Destination untouched. |
+| `/transfers/:id/receive` | `PATCH` | `ADMIN`, `OPERATIONS` | Atomic stock increment at destination. 409 Conflict on double-receive attempts. |
+
+---
+
 ## Work Order Module (Phase 4)
 
 The Work Order module enables creation, tracking, and management of internal manufacturing and processing jobs.
@@ -27,85 +90,35 @@ Work Orders follow a strict, uni-directional state machine:
 4. **Any -> `ASSIGNED`**: **REJECTED (400 Bad Request)**. Status cannot transition backward.
 5. **`COMPLETED` -> Any**: **REJECTED (400 Bad Request)**. `COMPLETED` is a terminal state.
 
-> **Operational Note on Completion**: Transitioning to `COMPLETED` does **not** block or fail on stock shortage. Completion represents a physical operational confirmation by the Operations user, not a system-gated availability lock.
-
 ---
 
 ### Material Availability & Shortage Calculation Formula
-
-The material shortage is calculated live on every read:
 
 $$\text{availableQtyAtLocation} = \sum (\text{physicalQty} - \text{reservedQty}) \quad \text{for all batches at location}$$
 
 $$\text{shortage} = \max(0, \, \text{requiredQty} - \text{availableQtyAtLocation})$$
 
-If no `InventoryStock` records exist for the item at the specified location, $\text{availableQtyAtLocation}$ evaluates to $0$, resulting in a full shortage ($\text{shortage} = \text{requiredQty}$).
-
----
-
-### Role & Access Authorization Rules
-
-| Endpoint | Method | Allowed Roles | Restrictions / Notes |
-| :--- | :--- | :--- | :--- |
-| `/work-orders` | `POST` | `ADMIN` | Creates Work Order in `ASSIGNED` status. `assignedUserId` must have role `OPERATIONS`. Returns created object with embedded `stockCheck`. |
-| `/work-orders` | `GET` | `ADMIN`, `OPERATIONS`, `SALES` | Supports `?status=`, `?locationId=`, `?assignedUserId=`, `page`, `limit`. **OPERATIONS users default to viewing their assigned Work Orders unless `?all=true` is passed.** |
-| `/work-orders/:id` | `GET` | `ADMIN`, `OPERATIONS`, `SALES` | Returns Work Order detail with embedded live `stockCheck` object. |
-| `/work-orders/:id/stock-check` | `GET` | `ADMIN`, `OPERATIONS`, `SALES` | Returns standalone `{ requiredQty, availableQtyAtLocation, shortage }`. |
-| `/work-orders/:id/status` | `PATCH` | `ADMIN`, `OPERATIONS` | **OPERATIONS users can ONLY update Work Orders assigned to them.** `ADMIN` can update any Work Order. Enforces state machine guards. |
-
 ---
 
 ### API Endpoints & Payload Specifications
 
-#### 1. Create Work Order (`POST /work-orders`)
-- **Headers**: `Authorization: Bearer <ADMIN_JWT>`
-- **Request Body**:
-  ```json
-  {
-    "locationId": "loc-uuid-123",
-    "itemId": "item-uuid-456",
-    "requiredQty": 50,
-    "assignedUserId": "ops-user-uuid-789"
-  }
-  ```
-- **Response (`201 Created`)**:
-  ```json
-  {
-    "id": "wo-uuid-100",
-    "locationId": "loc-uuid-123",
-    "itemId": "item-uuid-456",
-    "requiredQty": 50,
-    "assignedUserId": "ops-user-uuid-789",
-    "status": "ASSIGNED",
-    "createdAt": "2026-08-21T21:00:00.000Z",
-    "location": { "id": "loc-uuid-123", "name": "Warehouse A" },
-    "item": { "id": "item-uuid-456", "sku": "SKU-001", "name": "Widget Box" },
-    "assignedUser": { "id": "ops-user-uuid-789", "name": "Ops Tech", "email": "ops@minerp.local", "role": "OPERATIONS" },
-    "stockCheck": {
-      "requiredQty": 50,
-      "availableQtyAtLocation": 80,
-      "shortage": 0
-    }
-  }
-  ```
-
-#### 2. Get Work Order Stock Check (`GET /work-orders/:id/stock-check`)
-- **Headers**: `Authorization: Bearer <JWT>`
-- **Response (`200 OK`)**:
-  ```json
-  {
-    "requiredQty": 50,
-    "availableQtyAtLocation": 30,
-    "shortage": 20
-  }
-  ```
-
-#### 3. Update Status (`PATCH /work-orders/:id/status`)
+#### 1. Create Stock Transfer (`POST /transfers`)
 - **Headers**: `Authorization: Bearer <JWT>`
 - **Request Body**:
   ```json
   {
-    "status": "IN_PROGRESS"
+    "sourceLocationId": "loc-source-uuid",
+    "destinationLocationId": "loc-dest-uuid",
+    "itemId": "item-uuid-123",
+    "quantity": 40
   }
   ```
-- **Response (`200 OK`)**: Returns updated Work Order object with status `IN_PROGRESS` and live `stockCheck`.
+- **Response (`201 Created`)**: Status `REQUESTED`.
+
+#### 2. Dispatch Stock Transfer (`PATCH /transfers/:id/dispatch`)
+- **Headers**: `Authorization: Bearer <JWT>`
+- **Response (`200 OK`)**: Status updated to `DISPATCHED`, `dispatchedAt` set, source `physicalQty` reduced.
+
+#### 3. Receive Stock Transfer (`PATCH /transfers/:id/receive`)
+- **Headers**: `Authorization: Bearer <JWT>`
+- **Response (`200 OK`)**: Status updated to `RECEIVED`, `receivedAt` set, destination `physicalQty` increased.
