@@ -1,14 +1,13 @@
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Search, Plus, Filter, RefreshCw, ClipboardList, AlertTriangle } from 'lucide-react';
-import { WorkOrder, WorkOrderStatus } from '../types';
+import { Search, Plus, RefreshCw, AlertTriangle } from 'lucide-react';
+import type { WorkOrder, WorkOrderStatus } from '../types';
 import { workOrdersApi } from '../api/workOrders.api';
 import { inventoryApi } from '../api/inventory.api';
-import { authApi } from '../api/auth.api';
-import { DataTable, Column } from '../components/common/DataTable';
+import { DataTable, type Column } from '../components/common/DataTable';
 import { StatusBadge } from '../components/common/StatusBadge';
 import { QuantityBadge } from '../components/common/QuantityBadge';
-import { RoleGuard } from '../components/common/RoleGuard';
+import { RoleGuard } from '../router/RoleGuard';
 import { useAuth } from '../context/AuthContext';
 import { CreateWorkOrderModal } from '../components/work-orders/CreateWorkOrderModal';
 import { WorkOrderDetailModal } from '../components/work-orders/WorkOrderDetailModal';

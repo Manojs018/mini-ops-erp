@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { X, ShieldAlert, AlertCircle } from 'lucide-react';
-import { InventoryStock } from '../../types';
+import type { InventoryStock } from '../../types';
 import { inventoryApi } from '../../api/inventory.api';
 import { getErrorMessage } from '../../api/axios';
 import { useToast } from '../common/Toast';

@@ -1,8 +1,8 @@
 import React from 'react';
-import { InventoryStock } from '../../types';
+import type { InventoryStock } from '../../types';
 import { DetailDrawer } from '../common/DetailDrawer';
 import { QuantityBadge } from '../common/QuantityBadge';
-import { RoleGuard } from '../common/RoleGuard';
+import { RoleGuard } from '../../router/RoleGuard';
 import { Sliders, ShieldAlert, Boxes, MapPin, Tag } from 'lucide-react';
 
 interface InventoryDetailDrawerProps {

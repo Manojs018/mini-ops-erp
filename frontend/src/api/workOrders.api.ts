@@ -1,5 +1,5 @@
 import { apiClient } from './axios';
-import { WorkOrder, WorkOrderStatus, StockCheck, PaginatedResponse } from '../types';
+import type { WorkOrder, WorkOrderStatus, StockCheck, PaginatedResponse } from '../types';
 
 export interface ListWorkOrderParams {
   status?: WorkOrderStatus;

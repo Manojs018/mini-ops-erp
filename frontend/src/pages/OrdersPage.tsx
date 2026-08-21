@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Search, Plus, Filter, RefreshCw, ShoppingCart, Ban } from 'lucide-react';
-import { CustomerOrder, CustomerOrderStatus } from '../types';
+import { Search, Plus, RefreshCw, Ban } from 'lucide-react';
+import type { CustomerOrder, CustomerOrderStatus } from '../types';
 import { ordersApi } from '../api/orders.api';
 import { inventoryApi } from '../api/inventory.api';
-import { DataTable, Column } from '../components/common/DataTable';
+import { DataTable, type Column } from '../components/common/DataTable';
 import { StatusBadge } from '../components/common/StatusBadge';
-import { RoleGuard } from '../components/common/RoleGuard';
+import { RoleGuard } from '../router/RoleGuard';
 import { useAuth } from '../context/AuthContext';
 import { CreateOrderModal } from '../components/orders/CreateOrderModal';
 import { OrderDetailDrawer } from '../components/orders/OrderDetailDrawer';

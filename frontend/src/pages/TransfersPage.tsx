@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
-import { Search, Plus, Filter, RefreshCw, ArrowLeftRight, Send, PackageCheck } from 'lucide-react';
-import { StockTransfer, StockTransferStatus } from '../types';
+import { Search, Plus, RefreshCw, Send, PackageCheck } from 'lucide-react';
+import type { StockTransfer, StockTransferStatus } from '../types';
 import { transfersApi } from '../api/transfers.api';
 import { inventoryApi } from '../api/inventory.api';
-import { DataTable, Column } from '../components/common/DataTable';
+import { DataTable, type Column } from '../components/common/DataTable';
 import { StatusBadge } from '../components/common/StatusBadge';
-import { RoleGuard } from '../components/common/RoleGuard';
+import { RoleGuard } from '../router/RoleGuard';
 import { CreateTransferModal } from '../components/transfers/CreateTransferModal';
 import { ReceiveStockModal } from '../components/transfers/ReceiveStockModal';
 import { TransferDetailDrawer } from '../components/transfers/TransferDetailDrawer';
@@ -84,7 +84,7 @@ export const TransfersPage: React.FC = () => {
       await transfersApi.dispatch(transfer.id, idempotencyKey);
       toast.success('Dispatched', 'Stock deducted from source warehouse.');
       refetch();
-    } catch (err) {
+    } catch {
       toast.error('Dispatch Failed', 'Insufficient stock or invalid state.');
     }
   };

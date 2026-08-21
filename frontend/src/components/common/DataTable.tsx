@@ -1,6 +1,6 @@
-import React, { ReactNode } from 'react';
+import { type ReactNode } from 'react';
 import { ChevronLeft, ChevronRight, Inbox } from 'lucide-react';
-import { PaginationInfo } from '../../types';
+import type { PaginationInfo } from '../../types';
 
 export interface Column<T> {
   header: string;

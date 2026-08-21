@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { WorkOrder, WorkOrderStatus } from '../../types';
+import type { WorkOrder, WorkOrderStatus } from '../../types';
 import { DetailDrawer } from '../common/DetailDrawer';
 import { StatusBadge } from '../common/StatusBadge';
 import { WorkOrderStockCheckCard } from './WorkOrderStockCheckCard';
@@ -7,7 +7,7 @@ import { workOrdersApi } from '../../api/workOrders.api';
 import { getErrorMessage } from '../../api/axios';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../common/Toast';
-import { ArrowRight, CheckCircle2, MapPin, UserCheck, AlertCircle } from 'lucide-react';
+import { ArrowRight, CheckCircle2, UserCheck, AlertCircle } from 'lucide-react';
 
 interface WorkOrderDetailModalProps {
   workOrder: WorkOrder | null;
@@ -104,7 +104,6 @@ export const WorkOrderDetailModal: React.FC<WorkOrderDetailModalProps> = ({
           workOrderId={workOrder.id}
           initialStockCheck={workOrder.stockCheck}
           itemId={workOrder.itemId}
-          sourceLocationId={workOrder.locationId}
         />
 
         {/* State Machine Control Panel */}

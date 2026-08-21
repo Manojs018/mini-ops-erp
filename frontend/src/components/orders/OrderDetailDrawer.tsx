@@ -1,13 +1,12 @@
 import React, { useState } from 'react';
-import { CustomerOrder } from '../../types';
+import type { CustomerOrder } from '../../types';
 import { DetailDrawer } from '../common/DetailDrawer';
 import { StatusBadge } from '../common/StatusBadge';
-import { RoleGuard } from '../common/RoleGuard';
 import { ordersApi } from '../../api/orders.api';
 import { getErrorMessage } from '../../api/axios';
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../common/Toast';
-import { ShoppingCart, Ban, User, AlertCircle } from 'lucide-react';
+import { Ban, User, AlertCircle } from 'lucide-react';
 
 interface OrderDetailDrawerProps {
   order: CustomerOrder | null;

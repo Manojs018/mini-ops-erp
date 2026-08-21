@@ -6,8 +6,6 @@ import {
   ClipboardList,
   ArrowLeftRight,
   ShoppingCart,
-  AlertTriangle,
-  CheckCircle2,
   TrendingUp,
   Plus,
 } from 'lucide-react';
@@ -17,9 +15,8 @@ import { inventoryApi } from '../api/inventory.api';
 import { workOrdersApi } from '../api/workOrders.api';
 import { transfersApi } from '../api/transfers.api';
 import { ordersApi } from '../api/orders.api';
-import { RoleGuard } from '../components/common/RoleGuard';
+import { RoleGuard } from '../router/RoleGuard';
 import { QuantityBadge } from '../components/common/QuantityBadge';
-import { StatusBadge } from '../components/common/StatusBadge';
 
 export const Dashboard: React.FC = () => {
   const { user } = useAuth();

@@ -1,5 +1,5 @@
 import { apiClient } from './axios';
-import { LoginResponse, User } from '../types';
+import type { LoginResponse, User } from '../types';
 
 export const authApi = {
   login: async (credentials: { email: string; password: string }): Promise<LoginResponse> => {

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { X, PackageCheck, AlertCircle } from 'lucide-react';
-import { StockTransfer } from '../../types';
+import type { StockTransfer } from '../../types';
 import { transfersApi } from '../../api/transfers.api';
 import { getErrorMessage } from '../../api/axios';
 import { useToast } from '../common/Toast';

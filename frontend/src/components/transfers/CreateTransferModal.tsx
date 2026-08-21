@@ -21,24 +21,24 @@ export const CreateTransferModal: React.FC<CreateTransferModalProps> = ({
   locations,
   items,
   initialItemId = '',
-  initialQty = '',
+  initialQty,
 }) => {
   const toast = useToast();
   const [sourceLocationId, setSourceLocationId] = useState('');
   const [destinationLocationId, setDestinationLocationId] = useState('');
   const [itemId, setItemId] = useState(initialItemId);
-  const [quantity, setQuantity] = useState<number | ''>(initialQty);
+  const [quantity, setQuantity] = useState<number | ''>(initialQty ?? '');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (initialItemId) setItemId(initialItemId);
-    if (initialQty) setQuantity(initialQty);
+    if (initialQty !== undefined) setQuantity(initialQty);
   }, [initialItemId, initialQty]);
 
   if (!isOpen) return null;
 
-  const isSameLocation = sourceLocationId && destinationLocationId && sourceLocationId === destinationLocationId;
+  const isSameLocation = Boolean(sourceLocationId && destinationLocationId && sourceLocationId === destinationLocationId);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

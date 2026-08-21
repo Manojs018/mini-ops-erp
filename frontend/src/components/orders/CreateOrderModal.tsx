@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { X, ShoppingCart, Plus, Trash2, AlertCircle, AlertTriangle } from 'lucide-react';
-import { InventoryStock } from '../../types';
-import { ordersApi, CreateOrderLineInput } from '../../api/orders.api';
+import { X, ShoppingCart, Plus, Trash2, AlertCircle } from 'lucide-react';
+import type { InventoryStock } from '../../types';
+import { ordersApi, type CreateOrderLineInput } from '../../api/orders.api';
 import { getErrorMessage } from '../../api/axios';
 import { useToast } from '../common/Toast';
 

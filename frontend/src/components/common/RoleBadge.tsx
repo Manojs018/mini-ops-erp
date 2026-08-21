@@ -1,5 +1,5 @@
 import React from 'react';
-import { Role } from '../../types';
+import type { Role } from '../../types';
 
 interface RoleBadgeProps {
   role: Role;

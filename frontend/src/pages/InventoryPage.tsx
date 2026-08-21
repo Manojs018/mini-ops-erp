@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Search, Plus, Filter, RefreshCw, Boxes, MapPin, Tag } from 'lucide-react';
-import { InventoryStock } from '../types';
+import { Search, Plus, Filter, RefreshCw, MapPin } from 'lucide-react';
+import type { InventoryStock } from '../types';
 import { inventoryApi } from '../api/inventory.api';
-import { DataTable, Column } from '../components/common/DataTable';
+import { DataTable, type Column } from '../components/common/DataTable';
 import { QuantityBadge } from '../components/common/QuantityBadge';
-import { RoleGuard } from '../components/common/RoleGuard';
+import { RoleGuard } from '../router/RoleGuard';
 import { AddInventoryModal } from '../components/inventory/AddInventoryModal';
 import { AdjustStockModal } from '../components/inventory/AdjustStockModal';
 import { ReportDamageModal } from '../components/inventory/ReportDamageModal';

@@ -1,5 +1,5 @@
-import React, { ReactNode } from 'react';
-import { Role } from '../types';
+import React, { type ReactNode } from 'react';
+import type { Role } from '../types';
 import { useAuth } from '../context/AuthContext';
 
 interface RoleGuardProps {

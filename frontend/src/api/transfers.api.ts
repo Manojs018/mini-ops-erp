@@ -1,5 +1,5 @@
 import { apiClient } from './axios';
-import { StockTransfer, StockTransferStatus, PaginatedResponse } from '../types';
+import type { StockTransfer, StockTransferStatus, PaginatedResponse } from '../types';
 
 export interface ListTransferParams {
   status?: StockTransferStatus;

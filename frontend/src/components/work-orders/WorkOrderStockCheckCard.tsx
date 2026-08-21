@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { RefreshCw, AlertTriangle, CheckCircle2, ArrowRight } from 'lucide-react';
-import { StockCheck } from '../../types';
+import type { StockCheck } from '../../types';
 import { workOrdersApi } from '../../api/workOrders.api';
 import { QuantityBadge } from '../common/QuantityBadge';
 import { useNavigate } from 'react-router-dom';
@@ -9,14 +9,12 @@ interface WorkOrderStockCheckCardProps {
   workOrderId: string;
   initialStockCheck?: StockCheck;
   itemId?: string;
-  sourceLocationId?: string;
 }
 
 export const WorkOrderStockCheckCard: React.FC<WorkOrderStockCheckCardProps> = ({
   workOrderId,
   initialStockCheck,
   itemId,
-  sourceLocationId,
 }) => {
   const navigate = useNavigate();
   const [stockCheck, setStockCheck] = useState<StockCheck | undefined>(initialStockCheck);

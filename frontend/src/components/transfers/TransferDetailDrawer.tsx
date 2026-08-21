@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { StockTransfer } from '../../types';
+import type { StockTransfer } from '../../types';
 import { DetailDrawer } from '../common/DetailDrawer';
 import { StatusBadge } from '../common/StatusBadge';
-import { RoleGuard } from '../common/RoleGuard';
+import { RoleGuard } from '../../router/RoleGuard';
 import { transfersApi } from '../../api/transfers.api';
 import { getErrorMessage } from '../../api/axios';
 import { useToast } from '../common/Toast';

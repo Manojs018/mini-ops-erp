@@ -1,5 +1,5 @@
 import axios, { AxiosError } from 'axios';
-import { APIError } from '../types';
+import type { APIError } from '../types';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000';
 

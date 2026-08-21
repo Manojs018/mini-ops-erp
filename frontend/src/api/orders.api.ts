@@ -1,5 +1,5 @@
 import { apiClient } from './axios';
-import { CustomerOrder, CustomerOrderStatus, PaginatedResponse } from '../types';
+import type { CustomerOrder, CustomerOrderStatus, PaginatedResponse } from '../types';
 
 export interface ListOrderParams {
   status?: CustomerOrderStatus;

@@ -1,5 +1,5 @@
 import { apiClient } from './axios';
-import { InventoryStock, PaginatedResponse } from '../types';
+import type { InventoryStock, PaginatedResponse } from '../types';
 
 export interface ListInventoryParams {
   locationId?: string;
