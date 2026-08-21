@@ -19,3 +19,9 @@ export class DuplicateTransactionError extends AppError {
     super(message, 409);
   }
 }
+
+export class InvalidTransitionError extends AppError {
+  constructor(message: string = 'Invalid status transition') {
+    super(message, 400);
+  }
+}
