@@ -152,8 +152,9 @@ export class InventoryService {
   /**
    * Get single inventory stock record detail by ID.
    */
-  static async getInventoryById(id: string): Promise<InventoryStockResponse> {
-    const record = await prisma.inventoryStock.findUnique({
+  static async getInventoryById(id: string, txPrisma?: any): Promise<InventoryStockResponse> {
+    const db = txPrisma || prisma;
+    const record = await db.inventoryStock.findUnique({
       where: { id },
       include: {
         item: {
@@ -180,6 +181,10 @@ export class InventoryService {
   ): Promise<InventoryStockResponse> {
     const { itemId, locationId, batch, physicalQty } = data;
 
+    if (typeof physicalQty !== 'number' || !Number.isInteger(physicalQty) || physicalQty < 0) {
+      throw new AppError('Physical quantity must be a non-negative integer', 400);
+    }
+
     if (!itemId || typeof itemId !== 'string') {
       throw new AppError('itemId is required', 400);
     }
@@ -188,51 +193,43 @@ export class InventoryService {
       throw new AppError('locationId is required', 400);
     }
 
-    if (!batch || typeof batch !== 'string' || !batch.trim()) {
+    if (!batch || typeof batch !== 'string') {
       throw new AppError('batch is required', 400);
     }
 
-    if (typeof physicalQty !== 'number' || !Number.isInteger(physicalQty) || physicalQty < 0) {
-      throw new AppError('Physical quantity must be a non-negative integer', 400);
-    }
-
-    // Validate itemId existence
     const item = await prisma.item.findUnique({ where: { id: itemId } });
     if (!item) {
       throw new AppError(`Item with ID '${itemId}' not found`, 404);
     }
 
-    // Validate locationId existence
     const location = await prisma.location.findUnique({ where: { id: locationId } });
     if (!location) {
       throw new AppError(`Location with ID '${locationId}' not found`, 404);
     }
 
-    // Check unique constraint (itemId, locationId, batch)
-    const existingStock = await prisma.inventoryStock.findUnique({
+    const existing = await prisma.inventoryStock.findUnique({
       where: {
         itemId_locationId_batch: {
           itemId,
           locationId,
-          batch: batch.trim(),
+          batch,
         },
       },
     });
 
-    if (existingStock) {
+    if (existing) {
       throw new AppError(
-        `An inventory stock record for item '${item.name}' at location '${location.name}' with batch '${batch.trim()}' already exists. Use the PATCH /inventory/:id/adjust endpoint to update stock quantities.`,
+        `Inventory stock for item '${itemId}', location '${locationId}', and batch '${batch}' already exists. Use adjust stock endpoint instead.`,
         409
       );
     }
 
-    // Execute stock creation and audit transaction in a single Prisma transaction
     const newStock = await prisma.$transaction(async (tx) => {
       const stock = await tx.inventoryStock.create({
         data: {
           itemId,
           locationId,
-          batch: batch.trim(),
+          batch,
           physicalQty,
           reservedQty: 0,
         },
@@ -280,20 +277,20 @@ export class InventoryService {
       throw new AppError('quantityChange cannot be zero', 400);
     }
 
-    const updatedStock = await prisma.$transaction(async (tx: any) => {
-      const currentStock = await tx.inventoryStock.findUnique({
+    const updatedStock = await prisma.$transaction(async (tx) => {
+      const current = await tx.inventoryStock.findUnique({
         where: { id },
       });
 
-      if (!currentStock) {
+      if (!current) {
         throw new AppError('Inventory stock record not found', 404);
       }
 
-      const newPhysicalQty = currentStock.physicalQty + quantityChange;
+      const newPhysicalQty = current.physicalQty + quantityChange;
 
-      if (newPhysicalQty < currentStock.reservedQty) {
+      if (newPhysicalQty < current.reservedQty) {
         throw new AppError(
-          `Cannot adjust physical stock to ${newPhysicalQty}. It would fall below currently reserved quantity of ${currentStock.reservedQty}.`,
+          `Cannot adjust physical stock to ${newPhysicalQty}. It would fall below currently reserved quantity of ${current.reservedQty}.`,
           400
         );
       }
@@ -355,8 +352,11 @@ export class InventoryService {
     quantity: number,
     referenceType: ReferenceType,
     referenceId: string,
-    idempotencyKey: string
+    idempotencyKey: string,
+    txPrisma?: any
   ): Promise<InventoryStockResponse> {
+    const db = txPrisma || prisma;
+
     if (typeof quantity !== 'number' || !Number.isInteger(quantity) || quantity <= 0) {
       throw new AppError('Reservation quantity must be a positive integer', 400);
     }
@@ -366,17 +366,17 @@ export class InventoryService {
     }
 
     // 1. Idempotency Check: Return existing record if idempotencyKey already executed
-    const existingTx = await prisma.inventoryTransaction.findUnique({
+    const existingTx = await db.inventoryTransaction.findUnique({
       where: { idempotencyKey },
     });
 
     if (existingTx) {
-      return this.getInventoryById(inventoryStockId);
+      return this.getInventoryById(inventoryStockId, db);
     }
 
     // 2. Atomic Conditional Update (Option A)
     // SQL: UPDATE "InventoryStock" SET "reservedQty" = "reservedQty" + $1 WHERE "id" = $2 AND ("physicalQty" - "reservedQty") >= $1
-    const updatedRows = await prisma.$queryRaw<any[]>`
+    const updatedRows = await db.$queryRaw<any[]>`
       UPDATE "InventoryStock"
       SET "reservedQty" = "reservedQty" + ${quantity},
           "version" = "version" + 1,
@@ -387,7 +387,7 @@ export class InventoryService {
     `;
 
     if (!updatedRows || updatedRows.length === 0) {
-      const currentStock = await prisma.inventoryStock.findUnique({
+      const currentStock = await db.inventoryStock.findUnique({
         where: { id: inventoryStockId },
       });
 
@@ -402,7 +402,7 @@ export class InventoryService {
     }
 
     // 3. Log matching audit InventoryTransaction
-    await prisma.inventoryTransaction.create({
+    await db.inventoryTransaction.create({
       data: {
         inventoryStockId,
         type: InventoryTransactionType.RESERVE,
@@ -413,7 +413,7 @@ export class InventoryService {
       },
     });
 
-    return this.getInventoryById(inventoryStockId);
+    return this.getInventoryById(inventoryStockId, db);
   }
 
   /**
@@ -426,8 +426,11 @@ export class InventoryService {
     quantity: number,
     referenceType: ReferenceType,
     referenceId: string,
-    idempotencyKey: string
+    idempotencyKey: string,
+    txPrisma?: any
   ): Promise<InventoryStockResponse> {
+    const db = txPrisma || prisma;
+
     if (typeof quantity !== 'number' || !Number.isInteger(quantity) || quantity <= 0) {
       throw new AppError('Release quantity must be a positive integer', 400);
     }
@@ -437,16 +440,16 @@ export class InventoryService {
     }
 
     // 1. Idempotency Check: Return existing record if idempotencyKey already executed
-    const existingTx = await prisma.inventoryTransaction.findUnique({
+    const existingTx = await db.inventoryTransaction.findUnique({
       where: { idempotencyKey },
     });
 
     if (existingTx) {
-      return this.getInventoryById(inventoryStockId);
+      return this.getInventoryById(inventoryStockId, db);
     }
 
     // 2. Atomic Conditional Update (Option A)
-    const updatedRows = await prisma.$queryRaw<any[]>`
+    const updatedRows = await db.$queryRaw<any[]>`
       UPDATE "InventoryStock"
       SET "reservedQty" = "reservedQty" - ${quantity},
           "version" = "version" + 1,
@@ -457,7 +460,7 @@ export class InventoryService {
     `;
 
     if (!updatedRows || updatedRows.length === 0) {
-      const currentStock = await prisma.inventoryStock.findUnique({
+      const currentStock = await db.inventoryStock.findUnique({
         where: { id: inventoryStockId },
       });
 
@@ -472,7 +475,7 @@ export class InventoryService {
     }
 
     // 3. Log matching audit InventoryTransaction
-    await prisma.inventoryTransaction.create({
+    await db.inventoryTransaction.create({
       data: {
         inventoryStockId,
         type: InventoryTransactionType.RELEASE,
@@ -483,6 +486,6 @@ export class InventoryService {
       },
     });
 
-    return this.getInventoryById(inventoryStockId);
+    return this.getInventoryById(inventoryStockId, db);
   }
 }

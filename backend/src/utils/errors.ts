@@ -31,3 +31,9 @@ export class InvalidTransferStateError extends AppError {
     super(message, 400);
   }
 }
+
+export class OrderAlreadyCancelledError extends AppError {
+  constructor(message: string = 'Customer order has already been cancelled') {
+    super(message, 409);
+  }
+}
