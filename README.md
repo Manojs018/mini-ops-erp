@@ -1,146 +1,183 @@
 # Mini Operations ERP
 
-A lightweight, enterprise-grade Operations ERP solution comprising a high-concurrency Node.js/TypeScript Express backend and a modern, role-aware React frontend.
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.0+-3178C6?logo=typescript)](https://www.typescriptlang.org/)
+[![React](https://img.shields.io/badge/React-19.0+-61DAFB?logo=react)](https://react.dev/)
+[![Express](https://img.shields.io/badge/Express.js-4.19+-000000?logo=express)](https://expressjs.com/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-14+-4169E1?logo=postgresql)](https://www.postgresql.org/)
+[![Prisma](https://img.shields.io/badge/Prisma-5.22+-2D3748?logo=prisma)](https://www.prisma.io/)
+[![Jest](https://img.shields.io/badge/Jest-29.0+-C21325?logo=jest)](https://jestjs.io/)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-v4.0-38B2AC?logo=tailwind-css)](https://tailwindcss.com/)
+
+A production-grade, enterprise operations ERP solution designed for high-concurrency inventory management, work order tracking, internal stock transfers, and customer order reservations. Built with a robust Node.js/TypeScript Express REST API backend and a responsive, role-aware React 19 frontend.
 
 ---
 
-## Tech Stack
+## 🛠️ Tech Stack
 
 ### Backend (`/backend`)
-- **Runtime**: Node.js (v18+)
-- **Language**: TypeScript (v5+)
-- **Framework**: Express.js
-- **Database**: PostgreSQL (v14+) & Prisma ORM (v5.22+)
-- **Authentication**: JWT (`jsonwebtoken`) & `bcryptjs`
-- **Testing**: Jest & Supertest (72 unit, API & concurrency tests)
+- **Runtime Environment**: Node.js (v18+)
+- **Language**: TypeScript (v5.0+)
+- **Web Framework**: Express.js
+- **Database & ORM**: PostgreSQL (v14+) with Prisma ORM (v5.22+)
+- **Authentication & Security**: JWT (`jsonwebtoken`), Password Hashing (`bcryptjs`), CORS Security, & Custom Role Middleware
+- **Testing Engine**: Jest (v29+) & Supertest for Unit, API Endpoint, and Atomic Concurrency Tests (72/72 tests passing)
 
 ### Frontend (`/frontend`)
 - **Framework**: React 19 + TypeScript + Vite
-- **Styling**: Tailwind CSS v4 + Lucide Icons + Google Fonts (Inter)
-- **Data Fetching**: TanStack Query (React Query) & Axios
-- **Routing & Guards**: React Router v7 + Auth & Role Guards
-- **Analytics**: Recharts (Pie & Bar charts)
+- **Styling & UI**: Tailwind CSS v4 + Lucide React Icons + Google Fonts (Inter)
+- **State & Data Management**: TanStack Query (React Query v5) & Axios HTTP Client
+- **Routing & Access Control**: React Router v7 + Guarded Route wrappers (`ProtectedRoute`, `RoleGuard`)
+- **Data Visualization**: Recharts (Pie & Bar chart analytics)
 
 ---
 
-## Architecture & Features
+## 🔑 Role-Based Access Control (RBAC)
 
-### 1. Role Matrix & Access Control
-- **ADMIN**: Full read/write access across all modules (Inventory creation/adjustment/damage, Work Order creation & status, Stock Transfer creation/dispatch/receive, Customer Order creation & cancellation override).
-- **OPERATIONS**: Read all modules. Create, adjust, and report damage on inventory. Update assigned Work Order status (`ASSIGNED -> IN_PROGRESS -> COMPLETED`). Request, dispatch, and receive internal stock transfers. Cannot create Work Orders or Customer Orders.
-- **SALES**: Read all modules. Create Customer Orders with multi-line batch selection. Cancel own Customer Orders (`reservedQty` released). Cannot modify inventory, Work Orders, or Stock Transfers.
+The system enforces strict role-based authorization across backend controllers and frontend UI components:
 
-### 2. Live-Verification Readiness & Change Coverage
-- **Damaged Stock Handling**: Dedicated `POST /inventory/:id/report-damage` endpoint and UI modal to deduct physical stock and log damage transactions.
-- **Partial Transfer Receipt**: `PATCH /transfers/:id/receive` with optional `quantity` input and visual progress meter (`receivedQty` / `remainingQty`).
-- **All-Or-Nothing Multi-Line Reservation**: Customer Orders reserve stock atomically across multiple lines or roll back completely (`409 Conflict`).
-- **Order Cancellation & Stock Release**: `PATCH /orders/:id/cancel` restores reserved stock (`availableQty` increases) via `releaseStock()`.
-- **Location Restriction Middleware**: Built-in middleware (`restrictToLocation`) enforcing user location scoping.
+| Role | Access Level & Permissions |
+| :--- | :--- |
+| **`ADMIN`** | Full read/write access across all system modules. Can create items, adjust stock, report damage, create Work Orders, transition Work Order statuses, request/dispatch/receive stock transfers, and create/cancel customer orders. |
+| **`OPERATIONS`** | Read access to all modules. Can create stock, adjust stock quantities, report damage, update status of assigned Work Orders (`ASSIGNED -> IN_PROGRESS -> COMPLETED`), and handle internal stock transfers (request, dispatch, receive). |
+| **`SALES`** | Read access to all modules. Can create Customer Orders with multi-line batch selection and cancel owned Customer Orders (releasing reserved stock). Blocked from creating or modifying Work Orders, Inventory Stock, or Stock Transfers. |
 
 ---
 
-## Setup & Running Locally
+## 📁 Environment Variables
 
-### 1. Backend Setup (`/backend`)
+### Backend Environment (`/backend/.env`)
+
+Create a `.env` file inside the `backend/` directory:
+
+```env
+# Server Port
+PORT=4000
+
+# PostgreSQL Connection String
+DATABASE_URL="postgresql://postgres:postgres@localhost:5432/min_erp?schema=public"
+
+# JWT Authentication Secret
+JWT_SECRET="dev-jwt-secret-min-erp-2026-key"
+
+# Allowed Frontend Origin (Optional for CORS configuration)
+FRONTEND_URL="http://localhost:5173"
+```
+
+### Frontend Environment (`/frontend/.env`)
+
+Create a `.env` file inside the `frontend/` directory:
+
+```env
+# Backend API Base URL
+VITE_API_BASE_URL=http://localhost:4000
+```
+
+---
+
+## ⚙️ Project & Database Setup
+
+### Prerequisites
+- **Node.js**: v18.0.0 or higher
+- **npm**: v9.0.0 or higher
+- **PostgreSQL**: v14.0 or higher *(Optional: Backend includes an automatic offline demo proxy mode)*
+
+### 1. Repository Setup
+
+Clone the repository to your local machine:
+```bash
+git clone https://github.com/Manojs018/mini-ops-erp.git
+cd mini-ops-erp
+```
+
+### 2. Backend Database Setup
+
+Navigate to the backend directory and install dependencies:
 ```bash
 cd backend
 npm install
 ```
 
-Set up `.env`:
-```env
-DATABASE_URL="postgresql://postgres:postgres@localhost:5432/minerp?schema=public"
-PORT=3000
-JWT_SECRET="dev-jwt-secret-min-erp-2026-key"
-```
-
-Run database migrations and seed script:
+Push database schema migrations and populate initial seed data into PostgreSQL:
 ```bash
-npx prisma migrate dev --name init
+# Push Prisma schema to PostgreSQL database
+npx prisma db push
+
+# Generate Prisma Client types
+npx prisma generate
+
+# Seed initial locations, categories, items, stock batches, and demo users
 npm run seed
 ```
 
-Start the backend server:
-```bash
-npm run dev
-# Server running at http://localhost:3000
-```
+---
 
-Run backend test suite:
+## 🚀 How to Run
+
+### Step 1: Start Backend Server
+In the `backend/` directory, start the Express development server:
+```bash
+cd backend
+npm run dev
+```
+The backend API server will start on **`http://localhost:4000`**.
+
+### Step 2: Start Frontend Application
+In a separate terminal window, navigate to the `frontend/` directory, install dependencies, and start Vite:
+```bash
+cd frontend
+npm install
+npm run dev
+```
+The frontend portal will start on **`http://localhost:5173`** (or `http://localhost:5174`).
+
+---
+
+## 🧪 How to Test
+
+### 1. Run Automated Backend Test Suite
+The backend features a comprehensive Jest test suite covering Unit logic, API Endpoints, State Machines, and Concurrency Race-Condition protection.
+
+In the `backend/` directory, run:
 ```bash
 npm test
 ```
 
-### 2. Frontend Setup (`/frontend`)
+#### Test Suite Highlights (72/72 Passing Tests):
+- **Auth Module**: JWT generation, login authorization, password hashing, and role middleware (`auth.test.ts`).
+- **Inventory Module**: Available quantity calculations, negative stock guards, duplicate batch prevention, and damage reporting (`inventory.test.ts`).
+- **Concurrency Engine**: Atomic conditional updates (`UPDATE WHERE (physical - reserved) >= qty`) and double-cancellation guards (`inventory.concurrency.test.ts`).
+- **Work Orders**: Strict state machine transitions (`ASSIGNED -> IN_PROGRESS -> COMPLETED`), operator assignment validation, and material shortage calculations (`work-order.test.ts`).
+- **Stock Transfers**: Inter-location movement, FIFO stock deduction, and concurrent double-receipt prevention (`transfer.test.ts`).
+- **Customer Orders**: Multi-line batch reservations and atomic stock release (`order.test.ts`).
+
+### 2. Verify Frontend Production Build
+To ensure all TypeScript types and Vite bundles build with **0 errors**:
 ```bash
 cd frontend
-npm install
-```
-
-Set up `.env`:
-```env
-VITE_API_BASE_URL=http://localhost:3000
-```
-
-Start the frontend Vite dev server:
-```bash
-npm run dev
-# App running at http://localhost:5173
-```
-
-Build production bundle:
-```bash
 npm run build
 ```
 
 ---
 
-## Demo & Verification Sequence
+## 📊 Core Business Logic & Prevention Rules
 
-1. **Log in as ADMIN** (`admin@minerp.local` / `password123`):
-   - Access **Dashboard** with live stock metrics and Recharts pipeline visualization.
-   - Navigate to **Inventory** to view live stock batches, physical/reserved/available meters.
-   - Click **Adjust Stock** or **Report Damage** to adjust inventory levels.
-
-2. **Work Order Shortage & Transfer Flow**:
-   - Go to **Work Orders** -> Click **Create Work Order** for an item requiring 100 units at Main Warehouse.
-   - Click the Work Order row -> Observe material shortage warning (`shortage = max(0, required - available)`).
-   - Click **Create Transfer for Shortage** button -> Auto-fills transfer request for secondary warehouse.
-   - Go to **Transfers** -> Click **Dispatch** (source stock deducted immediately).
-   - Click **Receive** -> Choose Partial Receipt (e.g. 40 units) or Full Receipt.
-   - Return to Work Order -> Click **Refresh Stock Check** -> Observe shortage updates to 0.
-
-3. **Customer Order Reservation & Cancellation Flow**:
-   - Log in as **SALES** (`sales@minerp.local` / `password123`).
-   - Go to **Customer Orders** -> Click **Create Customer Order**.
-   - Build multi-line order selecting batch and quantity -> Click **Place Customer Order**.
-   - Inspect **Inventory** -> Observe `reservedQty` increased and `availableQty` decreased, while `physicalQty` remains unchanged.
-   - Go to **Customer Orders** -> Click **Cancel Order**.
-   - Inspect **Inventory** -> Observe `reservedQty` released and `availableQty` restored.
+| Module | Core Logic & System Prevention Rules | Formula / Constraint |
+| :--- | :--- | :--- |
+| **Inventory** | **Formula**: `Available = Physical - Reserved`.<br>**Prevention**: Rejects negative physical stock, invalid quantity inputs, and duplicate batch creation per `(itemId, locationId, batch)`. | `Available = Physical - Reserved` |
+| **Work Orders** | **Formula**: `Shortage = max(0, Required - Available)`.<br>**Prevention**: Enforces strict state machine transitions (`ASSIGNED -> IN_PROGRESS -> COMPLETED`). Direct transition to `COMPLETED` is rejected. | `Shortage = Math.max(0, Required - Available)` |
+| **Stock Transfers** | **Three-Phase Flow**: `Requested -> Dispatched -> Received`.<br>**Prevention**: On dispatch, source stock reduces via FIFO. Destination stock is untouched until receipt. Double-receipt is rejected (`409 Conflict`). | `Remaining = max(0, Quantity - Received)` |
+| **Customer Orders** | **Multi-Line Reservation**: All-or-nothing batch reservation.<br>**Prevention**: Atomic SQL updates prevent concurrent over-reservation (`(physical - reserved) >= quantity`). Re-allocates reserved stock upon cancellation. | `Atomic SQL UPDATE ... WHERE (physical - reserved) >= qty` |
 
 ---
 
-## Project Structure
+## 📝 Demo User Credentials
 
-```
-minErp/
-├── backend/
-│   ├── prisma/            # Schema definition & migrations
-│   ├── src/
-│   │   ├── middleware/    # Auth, Role, & Location restriction
-│   │   ├── modules/       # Auth, Inventory, WorkOrders, Transfers, Orders
-│   │   └── app.ts         # Express app configuration & CORS
-│   └── package.json
-├── frontend/
-│   ├── src/
-│   │   ├── api/           # Typed Axios API clients & error handler
-│   │   ├── components/    # Common UI, layout shell, & module modals
-│   │   ├── context/       # AuthContext session management
-│   │   ├── pages/         # Login, Dashboard, Inventory, WorkOrders, Transfers, Orders
-│   │   ├── router/        # AppRouter & ProtectedRoute / RoleGuard
-│   │   └── types/         # TypeScript interfaces
-│   ├── index.html
-│   ├── vite.config.ts
-│   └── package.json
-└── docs/                  # API documentation & location restriction guide
-```
+The application includes pre-configured demo user accounts:
+
+| Role | Email | Password | Assigned Location |
+| :--- | :--- | :--- | :--- |
+| **System Admin** | `admin@minerp.local` | `password123` | Warehouse A (Main) |
+| **Operations Lead** | `ops@minerp.local` | `password123` | Warehouse A (Main) |
+| **Sales Representative** | `sales@minerp.local` | `password123` | Warehouse B (Secondary) |
+
+*(Quick-login buttons are available directly on the login screen).*
