@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Search, Plus, Filter, RefreshCw, MapPin } from 'lucide-react';
+import { Search, Plus, Filter, RefreshCw, MapPin, Tag } from 'lucide-react';
 import type { InventoryStock } from '../types';
 import { inventoryApi } from '../api/inventory.api';
 import { DataTable, type Column } from '../components/common/DataTable';
@@ -30,13 +30,14 @@ export const InventoryPage: React.FC = () => {
 
   const rawList = inventoryData?.data || [];
 
-  // Client-side search filter for item name, SKU, or batch
+  // Client-side search filter for item name, SKU, category or batch
   const filteredList = rawList.filter((stock) => {
     if (!searchTerm) return true;
     const q = searchTerm.toLowerCase();
     return (
       stock.item?.name.toLowerCase().includes(q) ||
       stock.item?.sku.toLowerCase().includes(q) ||
+      stock.item?.category?.name.toLowerCase().includes(q) ||
       stock.batch.toLowerCase().includes(q) ||
       stock.location?.name.toLowerCase().includes(q)
     );
@@ -59,7 +60,8 @@ export const InventoryPage: React.FC = () => {
     ).values()
   );
 
-  // Table Columns Setup
+  // Table Columns Setup — Matching exact inventory checklist requirements:
+  // Item, Category, Location, Batch, Physical Quantity, Reserved Quantity, Available Quantity
   const columns: Column<InventoryStock>[] = [
     {
       header: 'Item & SKU',
@@ -68,6 +70,15 @@ export const InventoryPage: React.FC = () => {
           <h4 className="font-bold text-slate-900 dark:text-slate-100">{row.item?.name || 'Item'}</h4>
           <p className="text-[11px] text-slate-400 font-mono">SKU: {row.item?.sku || 'N/A'}</p>
         </div>
+      ),
+    },
+    {
+      header: 'Category',
+      cell: (row) => (
+        <span className="inline-flex items-center space-x-1.5 text-xs text-slate-700 dark:text-slate-300">
+          <Tag className="h-3.5 w-3.5 text-slate-400" />
+          <span>{row.item?.category?.name || 'General'}</span>
+        </span>
       ),
     },
     {
@@ -156,22 +167,11 @@ export const InventoryPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Filter & Search Toolbar */}
+      {/* Filter Tabs & Search Bar */}
       <div className="flex flex-col space-y-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-xs dark:border-slate-800 dark:bg-slate-900 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
-        <div className="relative flex-1 sm:max-w-xs">
-          <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
-          <input
-            type="text"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Search SKU, item or batch..."
-            className="w-full rounded-xl border border-slate-200 bg-white pl-9 pr-4 py-2 text-xs text-slate-900 placeholder-slate-400 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
-          />
-        </div>
-
-        <div className="flex items-center space-x-3">
-          <div className="flex items-center space-x-1.5 text-xs text-slate-500">
-            <Filter className="h-3.5 w-3.5" />
+        <div className="flex items-center space-x-2">
+          <div className="flex items-center space-x-1.5 text-xs font-semibold text-slate-500">
+            <Filter className="h-3.5 w-3.5 text-slate-400" />
             <span>Location:</span>
           </div>
           <select
@@ -180,7 +180,7 @@ export const InventoryPage: React.FC = () => {
               setLocationIdFilter(e.target.value);
               setPage(1);
             }}
-            className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-2xs focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+            className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-2xs focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
           >
             <option value="">All Locations</option>
             {uniqueLocations.map((loc) => (
@@ -190,15 +190,26 @@ export const InventoryPage: React.FC = () => {
             ))}
           </select>
         </div>
+
+        <div className="relative flex-1 sm:max-w-xs">
+          <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+          <input
+            type="text"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="Search item, SKU, category or batch..."
+            className="w-full rounded-xl border border-slate-200 bg-white pl-9 pr-4 py-2 text-xs text-slate-900 placeholder-slate-400 focus:border-indigo-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+          />
+        </div>
       </div>
 
-      {/* Main Stock Data Table */}
+      {/* Data Table */}
       <DataTable
         columns={columns}
         data={filteredList}
         keyExtractor={(row) => row.id}
         isLoading={isLoading}
-        emptyMessage="No stock records found matching your filters."
+        emptyMessage="No inventory stock batches found matching your filters."
         pagination={inventoryData?.pagination}
         onPageChange={(p) => setPage(p)}
         onRowClick={(row) => setSelectedStock(row)}
@@ -209,8 +220,8 @@ export const InventoryPage: React.FC = () => {
         isOpen={isAddOpen}
         onClose={() => setIsAddOpen(false)}
         onSuccess={() => refetch()}
-        items={uniqueItems}
         locations={uniqueLocations}
+        items={uniqueItems}
       />
 
       {/* Adjust Stock Modal */}
@@ -229,13 +240,19 @@ export const InventoryPage: React.FC = () => {
         onSuccess={() => refetch()}
       />
 
-      {/* Detail Slide-Over Drawer */}
+      {/* Slide-Over Detail Drawer */}
       <InventoryDetailDrawer
         stock={selectedStock}
         isOpen={!!selectedStock}
         onClose={() => setSelectedStock(null)}
-        onAdjust={(s) => setAdjustingStock(s)}
-        onReportDamage={(s) => setDamagingStock(s)}
+        onAdjust={(stk) => {
+          setSelectedStock(null);
+          setAdjustingStock(stk);
+        }}
+        onReportDamage={(stk) => {
+          setSelectedStock(null);
+          setDamagingStock(stk);
+        }}
       />
     </div>
   );
