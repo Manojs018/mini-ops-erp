@@ -55,7 +55,7 @@ export class WorkOrderService {
     });
 
     const availableQtyAtLocation = stockRecords.reduce(
-      (sum, record) => sum + (record.physicalQty - record.reservedQty),
+      (sum: number, record: any) => sum + (record.physicalQty - record.reservedQty),
       0
     );
 
@@ -223,7 +223,7 @@ export class WorkOrderService {
 
     // Attach computed stockCheck for convenience on listed work orders
     const dataWithStockCheck = await Promise.all(
-      records.map(async (record) => {
+      records.map(async (record: any) => {
         const stockCheck = await this.computeStockCheck(
           record.itemId,
           record.locationId,

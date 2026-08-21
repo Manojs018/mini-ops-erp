@@ -158,7 +158,7 @@ export class TransferService {
     ]);
 
     return {
-      data: records.map((record) => this.formatTransferResponse(record)),
+      data: records.map((record: any) => this.formatTransferResponse(record)),
       pagination: {
         total,
         page,
@@ -198,7 +198,7 @@ export class TransferService {
   static async dispatchTransfer(transferId: string, idempotencyKey?: string) {
     const dispatchKey = idempotencyKey || `transfer-dispatch-${transferId}`;
 
-    return await prisma.$transaction(async (tx) => {
+    return await prisma.$transaction(async (tx: any) => {
       const existingTransfer = await tx.stockTransfer.findUnique({
         where: { id: transferId },
       });
@@ -224,7 +224,7 @@ export class TransferService {
       });
 
       const totalPhysicalAvailable = sourceStocks.reduce(
-        (sum, row) => sum + row.physicalQty,
+        (sum: number, row: any) => sum + row.physicalQty,
         0
       );
 
@@ -289,7 +289,7 @@ export class TransferService {
    * Supports full receipt (quantity === undefined) or partial receipt (explicit quantity).
    */
   static async receiveTransfer(transferId: string, idempotencyKey?: string, quantity?: number) {
-    return await prisma.$transaction(async (tx) => {
+    return await prisma.$transaction(async (tx: any) => {
       // 1. Re-query transfer status inside the database transaction for concurrency safety
       const transfer = await tx.stockTransfer.findUnique({
         where: { id: transferId },

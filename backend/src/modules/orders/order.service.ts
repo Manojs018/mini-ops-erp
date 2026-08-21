@@ -101,7 +101,7 @@ export class OrderService {
     }
 
     // ATOMIC ALL-OR-NOTHING RESERVATION TRANSACTION
-    return await prisma.$transaction(async (tx) => {
+    return await prisma.$transaction(async (tx: any) => {
       // 1. Insert CustomerOrder parent row inside transaction
       const order = await tx.customerOrder.create({
         data: {
@@ -270,7 +270,7 @@ export class OrderService {
    * - Race Condition Guard: Re-queries status inside transaction to serialize concurrent cancellations.
    */
   static async cancelOrder(orderId: string, currentUserId: string, currentUserRole: Role) {
-    return await prisma.$transaction(async (tx) => {
+    return await prisma.$transaction(async (tx: any) => {
       // 1. Re-query order status inside transaction (row lock & concurrency guard)
       const order = await tx.customerOrder.findUnique({
         where: { id: orderId },

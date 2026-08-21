@@ -136,8 +136,8 @@ export class InventoryService {
       }),
     ]);
 
-    const data = records.map((record) => this.formatStockResponse(record));
-
+    const data = records.map((record: any) => this.formatStockResponse(record));
+    
     return {
       data,
       pagination: {
@@ -224,7 +224,7 @@ export class InventoryService {
       );
     }
 
-    const newStock = await prisma.$transaction(async (tx) => {
+    const newStock = await prisma.$transaction(async (tx: any) => {
       const stock = await tx.inventoryStock.create({
         data: {
           itemId,
@@ -277,7 +277,7 @@ export class InventoryService {
       throw new AppError('quantityChange cannot be zero', 400);
     }
 
-    const updatedStock = await prisma.$transaction(async (tx) => {
+    const updatedStock = await prisma.$transaction(async (tx: any) => {
       const current = await tx.inventoryStock.findUnique({
         where: { id },
       });
