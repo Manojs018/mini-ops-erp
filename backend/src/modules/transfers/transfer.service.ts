@@ -180,6 +180,7 @@ export class TransferService {
 
   /**
    * ATOMIC DISPATCH STEP: dispatchTransfer
+   * - Executes status check and stock deduction inside a single database transaction.
    * - Verifies current status is REQUESTED.
    * - Deducts physical stock from source location using FIFO batch allocation (createdAt asc).
    * - Throws InsufficientStockError (409 Conflict) if total physical stock at source < quantity.
@@ -188,23 +189,23 @@ export class TransferService {
    * - Destination stock is NOT touched at this step.
    */
   static async dispatchTransfer(transferId: string, idempotencyKey?: string) {
-    const existingTransfer = await prisma.stockTransfer.findUnique({
-      where: { id: transferId },
-    });
-
-    if (!existingTransfer) {
-      throw new AppError('Stock Transfer not found', 404);
-    }
-
-    if (existingTransfer.status !== StockTransferStatus.REQUESTED) {
-      throw new InvalidTransferStateError(
-        `Transfer cannot be dispatched. Current status is ${existingTransfer.status}. Only REQUESTED transfers can be dispatched.`
-      );
-    }
-
     const dispatchKey = idempotencyKey || `transfer-dispatch-${transferId}`;
 
-    const updatedTransfer = await prisma.$transaction(async (tx) => {
+    return await prisma.$transaction(async (tx) => {
+      const existingTransfer = await tx.stockTransfer.findUnique({
+        where: { id: transferId },
+      });
+
+      if (!existingTransfer) {
+        throw new AppError('Stock Transfer not found', 404);
+      }
+
+      if (existingTransfer.status !== StockTransferStatus.REQUESTED) {
+        throw new InvalidTransferStateError(
+          `Transfer cannot be dispatched. Current status is ${existingTransfer.status}. Only REQUESTED transfers can be dispatched.`
+        );
+      }
+
       // 1. Fetch source inventory stock rows ordered FIFO by createdAt
       const sourceStocks = await tx.inventoryStock.findMany({
         where: {
@@ -264,8 +265,7 @@ export class TransferService {
       });
 
       // 4. Log TRANSFER_OUT audit InventoryTransaction
-      // First source stock row's ID is used as foreign key container
-      const primarySourceStockId = sourceStocks[0].id;
+      const primarySourceStockId = sourceStocks.length > 0 ? sourceStocks[0].id : existingTransfer.itemId;
       await tx.inventoryTransaction.create({
         data: {
           inventoryStockId: primarySourceStockId,
@@ -279,8 +279,6 @@ export class TransferService {
 
       return transfer;
     });
-
-    return updatedTransfer;
   }
 
   /**
