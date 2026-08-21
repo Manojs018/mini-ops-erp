@@ -55,6 +55,10 @@ export class InventoryService {
    * Helper to format InventoryStock DB row into API response with computed availableQty.
    */
   private static formatStockResponse(stock: any): InventoryStockResponse {
+    if (!stock) {
+      throw new AppError('Inventory stock record not found', 404);
+    }
+
     return {
       id: stock.id,
       itemId: stock.itemId,
@@ -132,7 +136,7 @@ export class InventoryService {
       }),
     ]);
 
-    const data = records.map(this.formatStockResponse);
+    const data = records.map((record) => this.formatStockResponse(record));
 
     return {
       data,
@@ -276,7 +280,7 @@ export class InventoryService {
       throw new AppError('quantityChange cannot be zero', 400);
     }
 
-    const updatedStock = await prisma.$transaction(async (tx) => {
+    const updatedStock = await prisma.$transaction(async (tx: any) => {
       const currentStock = await tx.inventoryStock.findUnique({
         where: { id },
       });
@@ -383,7 +387,6 @@ export class InventoryService {
     `;
 
     if (!updatedRows || updatedRows.length === 0) {
-      // Fetch current stock to report exact availability in error response
       const currentStock = await prisma.inventoryStock.findUnique({
         where: { id: inventoryStockId },
       });
