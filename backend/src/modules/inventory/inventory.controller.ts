@@ -4,6 +4,7 @@ import { InventoryService } from './inventory.service';
 export class InventoryController {
   /**
    * GET /inventory
+   * List inventory with filters and pagination
    */
   static async list(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
@@ -25,6 +26,7 @@ export class InventoryController {
 
   /**
    * GET /inventory/:id
+   * Get single inventory stock detail
    */
   static async getById(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
@@ -38,6 +40,7 @@ export class InventoryController {
 
   /**
    * POST /inventory
+   * Create new inventory stock record (ADMIN, OPERATIONS)
    */
   static async create(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
@@ -58,6 +61,7 @@ export class InventoryController {
 
   /**
    * PATCH /inventory/:id/adjust
+   * Adjust physical stock quantity (ADMIN, OPERATIONS)
    */
   static async adjust(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
@@ -70,6 +74,22 @@ export class InventoryController {
         type,
       });
 
+      res.status(200).json(result);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  /**
+   * POST /inventory/:id/report-damage
+   * Report damaged stock (ADMIN, OPERATIONS)
+   */
+  static async reportDamage(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { id } = req.params;
+      const { quantity, reason } = req.body;
+
+      const result = await InventoryService.reportDamage(id, { quantity, reason });
       res.status(200).json(result);
     } catch (error) {
       next(error);

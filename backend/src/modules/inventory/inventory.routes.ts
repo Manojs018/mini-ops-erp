@@ -12,5 +12,6 @@ router.get('/:id', authenticate, requireRole(['ADMIN', 'OPERATIONS', 'SALES']), 
 // Write endpoints restricted to ADMIN and OPERATIONS
 router.post('/', authenticate, requireRole(['ADMIN', 'OPERATIONS']), InventoryController.create);
 router.patch('/:id/adjust', authenticate, requireRole(['ADMIN', 'OPERATIONS']), InventoryController.adjust);
+router.post('/:id/report-damage', authenticate, requireRole(['ADMIN', 'OPERATIONS']), InventoryController.reportDamage);
 
 export default router;

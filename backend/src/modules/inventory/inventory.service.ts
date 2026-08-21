@@ -343,6 +343,27 @@ export class InventoryService {
   }
 
   /**
+   * Report damaged inventory stock (ADMIN, OPERATIONS).
+   * Reduces physicalQty by specified positive quantity and logs InventoryTransaction of type DAMAGE.
+   */
+  static async reportDamage(
+    id: string,
+    data: { quantity: number; reason?: string }
+  ): Promise<InventoryStockResponse> {
+    const { quantity, reason } = data;
+
+    if (typeof quantity !== 'number' || !Number.isInteger(quantity) || quantity <= 0) {
+      throw new AppError('Damaged quantity must be a positive integer', 400);
+    }
+
+    return this.adjustStock(id, {
+      quantityChange: -quantity,
+      reason: reason || 'DAMAGED_STOCK_REPORTED',
+      type: InventoryTransactionType.DAMAGE,
+    });
+  }
+
+  /**
    * ATOMIC CONCURRENCY ENGINE: Reserve Stock
    * Option A: Uses atomic conditional SQL UPDATE with WHERE (physical_qty - reserved_qty) >= quantity.
    * Prevents race conditions and guarantees non-negative available quantity under heavy concurrent load.
