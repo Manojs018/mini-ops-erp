@@ -25,3 +25,9 @@ export class InvalidTransitionError extends AppError {
     super(message, 400);
   }
 }
+
+export class InvalidTransferStateError extends AppError {
+  constructor(message: string = 'Invalid transfer state') {
+    super(message, 400);
+  }
+}
