@@ -24,6 +24,11 @@ export interface ListWorkOrderFilters {
   limit?: number;
 }
 
+export interface CurrentUserInfo {
+  userId: string;
+  role: Role;
+}
+
 export class WorkOrderService {
   /**
    * Pure, testable shortage calculation function.
@@ -161,7 +166,7 @@ export class WorkOrderService {
    */
   static async listWorkOrders(
     filters: ListWorkOrderFilters,
-    currentUser: { id: string; role: Role }
+    currentUser: CurrentUserInfo
   ) {
     const page = Math.max(1, Number(filters.page) || 1);
     const limit = Math.max(1, Math.min(100, Number(filters.limit) || 10));
@@ -182,7 +187,7 @@ export class WorkOrderService {
       if (filters.assignedUserId) {
         where.assignedUserId = filters.assignedUserId;
       } else if (!filters.all) {
-        where.assignedUserId = currentUser.id;
+        where.assignedUserId = currentUser.userId;
       }
     } else if (filters.assignedUserId) {
       where.assignedUserId = filters.assignedUserId;
@@ -307,7 +312,7 @@ export class WorkOrderService {
   static async updateWorkOrderStatus(
     id: string,
     targetStatus: WorkOrderStatus,
-    currentUser: { id: string; role: Role }
+    currentUser: CurrentUserInfo
   ) {
     if (!targetStatus || !Object.values(WorkOrderStatus).includes(targetStatus)) {
       throw new AppError(
@@ -327,7 +332,7 @@ export class WorkOrderService {
     // Role Rule: OPERATIONS users can only transition Work Orders assigned to them
     if (
       currentUser.role === Role.OPERATIONS &&
-      workOrder.assignedUserId !== currentUser.id
+      workOrder.assignedUserId !== currentUser.userId
     ) {
       throw new AppError(
         'Insufficient permissions: Operations users can only update Work Orders assigned to them',
