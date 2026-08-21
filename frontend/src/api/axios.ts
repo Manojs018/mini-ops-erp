@@ -44,6 +44,9 @@ export function getErrorMessage(error: unknown): string {
     if (apiErr?.error?.message) {
       return apiErr.error.message;
     }
+    if (error.code === 'ERR_NETWORK' || error.message === 'Network Error') {
+      return `Cannot connect to backend API server at ${API_BASE_URL}. Please start the backend using 'npm run dev' inside the backend/ directory.`;
+    }
     if (error.message) {
       return error.message;
     }
