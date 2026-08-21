@@ -1,3 +1,5 @@
+// Prisma Schema for Mini Operations ERP
+
 generator client {
   provider = "prisma-client-js"
 }
@@ -16,10 +18,11 @@ enum Role {
 enum InventoryTransactionType {
   RECEIPT
   ISSUE
+  TRANSFER_IN
+  TRANSFER_OUT
   RESERVE
   RELEASE
-  TRANSFER_OUT
-  TRANSFER_IN
+  ADJUSTMENT
   DAMAGE
 }
 
@@ -27,6 +30,7 @@ enum ReferenceType {
   WORK_ORDER
   TRANSFER
   ORDER
+  MANUAL
 }
 
 enum WorkOrderStatus {
@@ -38,6 +42,7 @@ enum WorkOrderStatus {
 enum StockTransferStatus {
   REQUESTED
   DISPATCHED
+  PARTIALLY_RECEIVED
   RECEIVED
 }
 
@@ -57,8 +62,8 @@ model User {
   location     Location? @relation(fields: [locationId], references: [id])
   createdAt    DateTime  @default(now())
 
-  assignedWorkOrders  WorkOrder[]
-  salesCustomerOrders CustomerOrder[]
+  assignedWorkOrders WorkOrder[]
+  customerOrders     CustomerOrder[]
 
   @@index([locationId])
 }
@@ -159,6 +164,7 @@ model StockTransfer {
   itemId                String
   item                  Item                @relation(fields: [itemId], references: [id])
   quantity              Int
+  receivedQty           Int                 @default(0)
   status                StockTransferStatus
   dispatchedAt          DateTime?
   receivedAt            DateTime?
