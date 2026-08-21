@@ -4,6 +4,7 @@ import authRoutes from './modules/auth/auth.routes';
 import inventoryRoutes from './modules/inventory/inventory.routes';
 import workOrderRoutes from './modules/work-orders/work-order.routes';
 import transferRoutes from './modules/transfers/transfer.routes';
+import orderRoutes from './modules/orders/order.routes';
 import { errorHandler } from './middleware/errorHandler';
 
 dotenv.config();
@@ -22,6 +23,7 @@ app.use('/auth', authRoutes);
 app.use('/inventory', inventoryRoutes);
 app.use('/work-orders', workOrderRoutes);
 app.use('/transfers', transferRoutes);
+app.use('/orders', orderRoutes);
 
 // Centralized Error Handler
 app.use(errorHandler);
