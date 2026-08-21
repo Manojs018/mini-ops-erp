@@ -20,6 +20,19 @@ export interface ListTransferFilters {
 
 export class TransferService {
   /**
+   * Helper to format StockTransfer DB row into response object with computed remainingQty.
+   */
+  private static formatTransferResponse(transfer: any) {
+    if (!transfer) return transfer;
+    const receivedQty = transfer.receivedQty || 0;
+    return {
+      ...transfer,
+      receivedQty,
+      remainingQty: Math.max(0, transfer.quantity - receivedQty),
+    };
+  }
+
+  /**
    * Request a new stock transfer.
    * Does NOT check or touch inventory stock; simply records intent.
    */
@@ -80,6 +93,7 @@ export class TransferService {
         destinationLocationId,
         itemId,
         quantity,
+        receivedQty: 0,
         status: StockTransferStatus.REQUESTED,
       },
       include: {
@@ -93,7 +107,7 @@ export class TransferService {
       },
     });
 
-    return transfer;
+    return this.formatTransferResponse(transfer);
   }
 
   /**
@@ -144,7 +158,7 @@ export class TransferService {
     ]);
 
     return {
-      data: records,
+      data: records.map((record) => this.formatTransferResponse(record)),
       pagination: {
         total,
         page,
@@ -175,18 +189,11 @@ export class TransferService {
       throw new AppError('Stock Transfer not found', 404);
     }
 
-    return transfer;
+    return this.formatTransferResponse(transfer);
   }
 
   /**
    * ATOMIC DISPATCH STEP: dispatchTransfer
-   * - Executes status check and stock deduction inside a single database transaction.
-   * - Verifies current status is REQUESTED.
-   * - Deducts physical stock from source location using FIFO batch allocation (createdAt asc).
-   * - Throws InsufficientStockError (409 Conflict) if total physical stock at source < quantity.
-   * - Updates status to DISPATCHED and sets dispatchedAt timestamp.
-   * - Logs InventoryTransaction of type TRANSFER_OUT.
-   * - Destination stock is NOT touched at this step.
    */
   static async dispatchTransfer(transferId: string, idempotencyKey?: string) {
     const dispatchKey = idempotencyKey || `transfer-dispatch-${transferId}`;
@@ -206,7 +213,6 @@ export class TransferService {
         );
       }
 
-      // 1. Fetch source inventory stock rows ordered FIFO by createdAt
       const sourceStocks = await tx.inventoryStock.findMany({
         where: {
           itemId: existingTransfer.itemId,
@@ -228,7 +234,6 @@ export class TransferService {
         );
       }
 
-      // 2. Deduct physical stock across source batches in FIFO order
       let remainingToDeduct = existingTransfer.quantity;
       for (const stockRow of sourceStocks) {
         if (remainingToDeduct <= 0) break;
@@ -246,7 +251,6 @@ export class TransferService {
         }
       }
 
-      // 3. Update Transfer status to DISPATCHED
       const transfer = await tx.stockTransfer.update({
         where: { id: transferId },
         data: {
@@ -264,7 +268,6 @@ export class TransferService {
         },
       });
 
-      // 4. Log TRANSFER_OUT audit InventoryTransaction
       const primarySourceStockId = sourceStocks.length > 0 ? sourceStocks[0].id : existingTransfer.itemId;
       await tx.inventoryTransaction.create({
         data: {
@@ -277,23 +280,15 @@ export class TransferService {
         },
       });
 
-      return transfer;
+      return this.formatTransferResponse(transfer);
     });
   }
 
   /**
    * ATOMIC RECEIVE STEP: receiveTransfer
-   * - Re-checks transfer status inside transaction to serialize concurrent requests.
-   * - Rejects if status is REQUESTED (not dispatched yet) with 400.
-   * - Rejects if status is RECEIVED with 409 Conflict ("Transfer has already been received").
-   * - Preserves batch traceability by finding or creating destination InventoryStock row.
-   * - Increments destination physicalQty by transfer quantity.
-   * - Updates status to RECEIVED and sets receivedAt timestamp.
-   * - Logs InventoryTransaction of type TRANSFER_IN.
+   * Supports full receipt (quantity === undefined) or partial receipt (explicit quantity).
    */
-  static async receiveTransfer(transferId: string, idempotencyKey?: string) {
-    const rxIdempotencyKey = idempotencyKey || `transfer-receive-${transferId}`;
-
+  static async receiveTransfer(transferId: string, idempotencyKey?: string, quantity?: number) {
     return await prisma.$transaction(async (tx) => {
       // 1. Re-query transfer status inside the database transaction for concurrency safety
       const transfer = await tx.stockTransfer.findUnique({
@@ -318,12 +313,42 @@ export class TransferService {
         throw new AppError('Transfer has already been received.', 409);
       }
 
-      // Guard: Cannot receive non-dispatched transfer (400 Bad Request)
-      if (transfer.status !== StockTransferStatus.DISPATCHED) {
+      // Guard: Cannot receive non-dispatched & non-partially-received transfer (400 Bad Request)
+      if (
+        transfer.status !== StockTransferStatus.DISPATCHED &&
+        transfer.status !== StockTransferStatus.PARTIALLY_RECEIVED
+      ) {
         throw new InvalidTransferStateError(
-          `Transfer cannot be received. Current status is ${transfer.status}. Only DISPATCHED transfers can be received.`
+          `Transfer cannot be received. Current status is ${transfer.status}. Only DISPATCHED or PARTIALLY_RECEIVED transfers can be received.`
         );
       }
+
+      const currentReceivedQty = transfer.receivedQty || 0;
+      const remainingUnreceived = transfer.quantity - currentReceivedQty;
+
+      // Determine actual receive quantity for this invocation
+      let receiveQty: number;
+      if (quantity === undefined || quantity === null) {
+        receiveQty = remainingUnreceived; // Full remaining receipt
+      } else {
+        if (typeof quantity !== 'number' || !Number.isInteger(quantity) || quantity <= 0) {
+          throw new AppError('Received quantity must be a positive integer', 400);
+        }
+
+        if (quantity > remainingUnreceived) {
+          throw new AppError(
+            `Only ${remainingUnreceived} units remain to be received on this transfer`,
+            400
+          );
+        }
+        receiveQty = quantity;
+      }
+
+      const newReceivedQty = currentReceivedQty + receiveQty;
+      const isFullyReceived = newReceivedQty === transfer.quantity;
+      const newStatus = isFullyReceived ? StockTransferStatus.RECEIVED : StockTransferStatus.PARTIALLY_RECEIVED;
+
+      const rxIdempotencyKey = idempotencyKey || `transfer-receive-${transferId}-${newReceivedQty}`;
 
       // 2. Idempotency Check: Return existing record if transaction was already processed
       const existingTx = await tx.inventoryTransaction.findUnique({
@@ -331,7 +356,7 @@ export class TransferService {
       });
 
       if (existingTx) {
-        return transfer;
+        return this.formatTransferResponse(transfer);
       }
 
       // 3. Preserve batch identifier from source stock
@@ -364,7 +389,7 @@ export class TransferService {
         const updatedDestStock = await tx.inventoryStock.update({
           where: { id: existingDestStock.id },
           data: {
-            physicalQty: existingDestStock.physicalQty + transfer.quantity,
+            physicalQty: existingDestStock.physicalQty + receiveQty,
             version: { increment: 1 },
           },
         });
@@ -375,19 +400,20 @@ export class TransferService {
             itemId: transfer.itemId,
             locationId: transfer.destinationLocationId,
             batch: batchToPreserve,
-            physicalQty: transfer.quantity,
+            physicalQty: receiveQty,
             reservedQty: 0,
           },
         });
         destinationStockId = newDestStock.id;
       }
 
-      // 5. Update Transfer status to RECEIVED
+      // 5. Update Transfer status and receivedQty
       const updatedTransfer = await tx.stockTransfer.update({
         where: { id: transferId },
         data: {
-          status: StockTransferStatus.RECEIVED,
-          receivedAt: new Date(),
+          receivedQty: newReceivedQty,
+          status: newStatus,
+          receivedAt: isFullyReceived ? new Date() : transfer.receivedAt,
         },
         include: {
           sourceLocation: true,
@@ -405,14 +431,14 @@ export class TransferService {
         data: {
           inventoryStockId: destinationStockId,
           type: InventoryTransactionType.TRANSFER_IN,
-          quantity: transfer.quantity,
+          quantity: receiveQty,
           referenceType: ReferenceType.TRANSFER,
           referenceId: transferId,
           idempotencyKey: rxIdempotencyKey,
         },
       });
 
-      return updatedTransfer;
+      return this.formatTransferResponse(updatedTransfer);
     });
   }
 }

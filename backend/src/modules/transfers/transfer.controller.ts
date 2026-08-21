@@ -79,14 +79,16 @@ export class TransferController {
 
   /**
    * PATCH /transfers/:id/receive
-   * Atomic receive: increments destination stock and sets status to RECEIVED
+   * Atomic receive: increments destination stock and sets status to PARTIALLY_RECEIVED or RECEIVED.
+   * Body can optionally contain { quantity?: number } for partial receipt.
    */
   static async receive(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const { id } = req.params;
+      const { quantity } = req.body || {};
       const idempotencyKey = req.headers['x-idempotency-key'] as string;
 
-      const result = await TransferService.receiveTransfer(id, idempotencyKey);
+      const result = await TransferService.receiveTransfer(id, idempotencyKey, quantity);
       res.status(200).json(result);
     } catch (error) {
       next(error);
