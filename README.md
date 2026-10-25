@@ -111,6 +111,8 @@ npm run seed
 
 ---
 
+[![Architecture diagram](https://gitdiagram.com/diagram-badge.svg)](https://gitdiagram.com/manojs018/mini-ops-erp?utm_source=readme&utm_medium=badge)
+
 ## 🚀 How to Run
 
 ### Step 1: Start Backend Server
